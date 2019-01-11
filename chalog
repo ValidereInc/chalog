@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+import os
+import sys
+import argparse
+import configparser
+
+class Chalog():
+  def __init__(self):
+    ADD_USAGE = 'chalog add [target version] [type] [identifier] [description]'
+    RELEASE_USAGE = 'chalog release [source version] [target version]'
+
+    self.directory = self.__get_directory_config()
+    self.parser = argparse.ArgumentParser(
+      formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    subparsers = self.parser.add_subparsers(help='sub-command help')
+
+    add_parser = subparsers.add_parser(
+      'add',
+      help=ADD_USAGE
+    )
+
+    add_parser.add_argument(
+      dest='add_args',
+      help=ADD_USAGE,
+      action='store',
+      nargs='*',
+      type=str
+    )
+
+    release_parser = subparsers.add_parser(
+      'release',
+      help=RELEASE_USAGE
+    )
+
+    release_parser.add_argument(
+      dest='release_args',
+      help=RELEASE_USAGE,
+      action='store',
+      nargs='*',
+      type=str
+    )
+
+  @staticmethod
+  def __get_directory_config():
+    config = configparser.ConfigParser()
+    config.read('.chalog')
+    if 'CONFIG' in config.sections() and 'directory' in config['CONFIG']:
+      return os.path.join(config['CONFIG']['directory'])
+    else:
+      return os.path.join(os.getcwd(), 'changelog')
+
+  def __handle_release(self, args):
+    if len(args) != 2:
+      self.__print_error('invalid args to \'release\': {}'.format(', '.join(args)))
+      sys.exit(1)
+    
+    source_version = args[0]
+    target_version = args[1]
+
+    source_dir = os.path.join(self.directory, source_version)
+    target_dir = os.path.join(self.directory, target_version)
+    
+    if not os.path.exists(source_dir):
+      sys.stderr.write('error: invalid source version\n')
+      sys.exit(1)
+
+    if os.path.exists(target_dir):
+      sys.stderr.write('error: invalid target version\n')
+      sys.exit(1)
+
+    changelog_content = self.__render_changelog(source_dir, target_version)
+    os.rename(source_dir, target_dir)
+    changelog_path = os.path.join(target_dir, 'CHANGELOG.md')
+    with open(changelog_path, 'w') as fp: fp.write(changelog_content)
+
+    sys.stdout.write('info: successfully generated changelog at: {}\n'.format(changelog_path))
+
+    sys.exit(0)
+
+  def __handle_add(self, args):
+    if len(args) < 4:
+      self.__print_error('invalid args to \'add\': {}'.format(', '.join(args)))
+      sys.exit(1)
+    
+    version = args[0]
+    section = args[1]
+    identifier = args[2]
+    description = ' '.join(args[3:])
+
+    target_dir = os.path.join(self.directory, version, section)
+    target_file = os.path.join(target_dir, '{}.md'.format(identifier))
+
+    if os.path.exists(target_file):
+      sys.stderr.write('error: entry already exists in {}\n'.format(target_file))
+      sys.exit(1)
+
+    if not os.path.exists(target_dir): os.makedirs(target_dir)
+    with open(target_file, 'w') as fp: fp.write(description)
+
+    sys.stdout.write('info: successfully added entry to {}\n'.format(target_file))
+    sys.exit(0)
+
+  def __render_changelog(self, source_dir, target_version):
+    changes = self.__get_changes(source_dir)
+
+    formatted = '## {}\n'.format(target_version)
+    for section in sorted(changes):
+      formatted = formatted + '\n### {}\n\n'.format(section)
+      for description in changes[section]:
+        formatted = formatted + '* {}\n'.format(description)
+    
+    return formatted
+
+  def __get_changes(self, source_dir):
+    changes = {}
+    for section in os.listdir(source_dir):
+      section_dir = os.path.join(source_dir, section)
+      if os.path.isdir(section_dir):
+        changes[section] = []
+        for file_name in os.listdir(section_dir):
+          file_path = os.path.join(section_dir, file_name)
+          with open(file_path, 'r') as fp: changes[section].append(fp.read())
+
+    return changes
+
+  def __print_error(self, message):
+    sys.stderr.write('error: {}\n'.format(message))
+    self.parser.print_help()
+    sys.exit(1)
+
+  def run(self):
+    args = vars(self.parser.parse_args())
+
+    if 'release_args' in args:
+      self.__handle_release(args['release_args'])
+    elif 'add_args' in args:
+      self.__handle_add(args['add_args'])
+    else:
+      self.parser.print_help()
+      sys.exit(1)
+
+
+if __name__ == '__main__':
+  app = Chalog()
+  app.run()

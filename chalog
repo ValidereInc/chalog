@@ -123,7 +123,8 @@ class Chalog():
           file_path = os.path.join(section_dir, file_name)
           entry_id = os.path.basename(file_path).split('.')[0]
           entry_prefix = '[PR: #{}] '.format(entry_id)
-          with open(file_path, 'r') as fp: changes[section].append(entry_prefix + fp.read())
+          with open(file_path, 'r') as fp:
+            changes[section].append(entry_prefix + fp.read().rstrip())
 
     return changes
 

@@ -120,11 +120,12 @@ class Chalog():
       if os.path.isdir(section_dir):
         changes[section] = []
         for file_name in os.listdir(section_dir):
-          file_path = os.path.join(section_dir, file_name)
-          entry_id = os.path.basename(file_path).split('.')[0]
-          entry_prefix = '[PR: #{}] '.format(entry_id)
-          with open(file_path, 'r') as fp:
-            changes[section].append(entry_prefix + fp.read().rstrip())
+          if file_name.endswith('.md'):
+            file_path = os.path.join(section_dir, file_name)
+            entry_id = os.path.basename(file_path).split('.')[0]
+            entry_prefix = '[PR: #{}] '.format(entry_id)
+            with open(file_path, 'r') as fp:
+              changes[section].append(entry_prefix + fp.read().rstrip())
 
     return changes
 

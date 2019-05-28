@@ -10,6 +10,7 @@ class Chalog():
     RELEASE_USAGE = 'chalog release [source version] [target version]'
 
     self.directory = self.__get_directory_config()
+    self.upstream = self.__get_upstream_config()
     self.parser = argparse.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -51,6 +52,15 @@ class Chalog():
     else:
       return os.path.join(os.getcwd(), 'changelog')
 
+  @staticmethod
+  def __get_upstream_config():
+    config = configparser.ConfigParser()
+    config.read('.chalog')
+    if 'CONFIG' in config.sections() and 'upstream' in config['CONFIG']:
+      return config['CONFIG']['upstream']
+    else:
+      return None
+      
   def __handle_release(self, args):
     if len(args) != 2:
       self.__print_error('invalid args to \'release\': {}'.format(', '.join(args)))
@@ -123,9 +133,16 @@ class Chalog():
           if file_name.endswith('.md'):
             file_path = os.path.join(section_dir, file_name)
             entry_id = os.path.basename(file_path).split('.')[0]
-            entry_prefix = '[PR: #{}] '.format(entry_id)
+            
+            entry_prefix = '[PR: #{}]'.format(entry_id)
+            if self.upstream:
+              pr_url = '{}/pull/{}'.format(self.upstream, entry_id)
+              entry_prefix = entry_prefix + '({})'.format(pr_url)
+
             with open(file_path, 'r') as fp:
-              changes[section].append(entry_prefix + fp.read().rstrip())
+              file_contents = fp.read().rstrip()
+              entry = '{} {}'.format(entry_prefix, file_contents)
+              changes[section].append(entry)
 
     return changes
 
